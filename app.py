@@ -3,31 +3,50 @@ import boto3
 import os
 
 # -----------------------------
-# Code Generation Function (Updated)
+# Configuration: Read from Environment Variables
 # -----------------------------
-def generate_code(access_key, secret_key, region, model_id, prompt):
+AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+AWS_REGION = os.getenv('AWS_REGION')
+BEDROCK_MODEL_ID = os.getenv('BEDROCK_MODEL_ID')
+
+# -----------------------------
+# Code Generation Function (Environment-based config)
+# -----------------------------
+def generate_code(prompt):
     """
-    Sends the user's prompt to CodeLlama via Amazon Bedrock and returns the generated code.
-    Accepts AWS credentials and model details from the user via the UI.
+    Sends the user's prompt to the selected Bedrock model and returns the generated code.
+    AWS credentials and model details are read from environment variables for security.
     Handles errors gracefully and provides user-friendly messages.
     """
+    # Check for required environment variables
+    missing_vars = []
+    if not AWS_ACCESS_KEY_ID:
+        missing_vars.append('AWS_ACCESS_KEY_ID')
+    if not AWS_SECRET_ACCESS_KEY:
+        missing_vars.append('AWS_SECRET_ACCESS_KEY')
+    if not AWS_REGION:
+        missing_vars.append('AWS_REGION')
+    if not BEDROCK_MODEL_ID:
+        missing_vars.append('BEDROCK_MODEL_ID')
+    if missing_vars:
+        return f"Error: Missing required environment variables: {', '.join(missing_vars)}"
+
     if not prompt or not prompt.strip():
         return "Please enter a valid prompt."
-    if not access_key or not secret_key or not region or not model_id:
-        return "Please provide all required AWS credentials and model details."
 
-    # Initialize the Bedrock client with user-provided credentials
+    # Initialize the Bedrock client with environment credentials
     try:
         client = boto3.client(
             'bedrock-runtime',
-            region_name=region,
-            aws_access_key_id=access_key,
-            aws_secret_access_key=secret_key
+            region_name=AWS_REGION,
+            aws_access_key_id=AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=AWS_SECRET_ACCESS_KEY
         )
     except Exception as e:
         return f"Failed to initialize Bedrock client: {e}"
 
-    # Prepare the request payload for CodeLlama
+    # Prepare the request payload for the selected model
     body = {
         "prompt": prompt,
         "max_gen_len": 512,  # Adjust as needed
@@ -37,7 +56,7 @@ def generate_code(access_key, secret_key, region, model_id, prompt):
 
     try:
         response = client.invoke_model(
-            modelId=model_id,
+            modelId=BEDROCK_MODEL_ID,
             body=bytes(str(body), 'utf-8'),
             accept='application/json',
             contentType='application/json'
@@ -54,29 +73,23 @@ def generate_code(access_key, secret_key, region, model_id, prompt):
         return f"Error generating code: {e}"
 
 # -----------------------------
-# Gradio UI Setup (Updated)
+# Gradio UI Setup (Prompt Only)
 # -----------------------------
 def main():
     """
     Launches the Gradio app for the coding assistant.
-    Now accepts AWS credentials and model details from the user.
+    Only the prompt is entered by the user; all other config is from environment variables.
     """
     description = """
-    # CodeLlama Coding Assistant 🦙\n
-    Enter your AWS credentials, region, and Bedrock model ID.\n
-    Then, enter a prompt describing the code you want. The assistant will generate code using CodeLlama via Amazon Bedrock.
+    # My Coding Assistant\n\n
+    Enter a prompt describing the code you want. The assistant will generate code using your selected Bedrock model.\n\n
+    (AWS credentials, region, and model ID are securely read from environment variables.)
     """
     iface = gr.Interface(
         fn=generate_code,
-        inputs=[
-            gr.Textbox(lines=1, label="AWS Access Key ID"),
-            gr.Textbox(lines=1, label="AWS Secret Access Key", type="password"),
-            gr.Textbox(lines=1, label="AWS Region", value="us-east-1"),
-            gr.Textbox(lines=1, label="Bedrock Model ID", value="codellama"),
-            gr.Textbox(lines=4, label="Enter your coding prompt")
-        ],
+        inputs=gr.Textbox(lines=4, label="Enter your coding prompt"),
         outputs=gr.Code(label="Generated Code"),
-        title="CodeLlama Coding Assistant",
+        title="My Coding Assistant",
         description=description,
         allow_flagging='never',
         theme="default"
