@@ -129,13 +129,13 @@ python app.py
 Below are some screenshots of the app in action:
 
 #### App Home Page
-![App Home Page](screenshots/screenshot1.png)
+![App Home Page](screenshots/mca_1.png)
 
 #### Chat Interface Example
-![Chat Interface](screenshots/screenshot2.png)
+![Chat Interface](screenshots/mca_2.png)
 
 #### AWS EC2 Instance Running
-![EC2 Instance](screenshots/screenshot3.png)
+![EC2 Instance](screenshots/mca_3.png)
 
 ---
 
