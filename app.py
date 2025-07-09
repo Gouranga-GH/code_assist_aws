@@ -1,90 +1,177 @@
 import gradio as gr
-import boto3
-import os
+# Correct import for Groq integration
+from langchain_groq import ChatGroq
 
-# -----------------------------
-# Code Generation Function (Region and Model ID from UI)
-# -----------------------------
-def generate_code(region, model_id, prompt):
+# System prompt for the coding assistant
+SYSTEM_PROMPT = (
+    "You are a helpful Coding Assistant. Answer questions, write code, and explain concepts in detail. "
+    "Always provide clear, step-by-step explanations and well-commented code."
+)
+
+# Default model name for Groq (can be parameterized if needed)
+DEFAULT_MODEL = "gemma2-9b-it"
+
+def chat_with_groq(api_key, chat_history, user_message):
     """
-    Sends the user's prompt to the selected Bedrock model and returns the generated code.
-    AWS region and model ID are provided by the user via the UI.
-    Handles errors gracefully and provides user-friendly messages.
+    Handles the interaction with the Groq Chat model using LangChain.
+    Args:
+        api_key (str): The Groq API key provided by the user.
+        chat_history (list): The conversation history as a list of (user, assistant) tuples.
+        user_message (str): The latest message from the user.
+    Returns:
+        updated_history (list): Updated conversation history including the assistant's reply.
     """
-    # Check for required UI inputs
-    missing_vars = []
-    if not region:
-        missing_vars.append('AWS Region')
-    if not model_id:
-        missing_vars.append('Bedrock Model ID')
-    if missing_vars:
-        return f"Error: Missing required input(s): {', '.join(missing_vars)}"
+    if not api_key or not api_key.strip():
+        return chat_history + [[user_message, "Please enter your Groq API key above."]]
 
-    if not prompt or not prompt.strip():
-        return "Please enter a valid prompt."
+    # Prepare the message history for the model as (role, content) tuples
+    messages = [("system", SYSTEM_PROMPT)]
+    for user, assistant in chat_history:
+        messages.append(("human", user))
+        if assistant:
+            messages.append(("ai", assistant))
+    messages.append(("human", user_message))
 
-    # Initialize the Bedrock client with region from UI (uses IAM Role if available)
     try:
-        client = boto3.client(
-            'bedrock-runtime',
-            region_name=region
-        )
+        # Initialize the ChatGroq model with the provided API key and model name
+        chat = ChatGroq(api_key=api_key, model=DEFAULT_MODEL)
+        response = chat.invoke(messages)
+        assistant_reply = response.content
     except Exception as e:
-        return f"Failed to initialize Bedrock client: {e}"
+        assistant_reply = f"Error: {str(e)}"
 
-    # Prepare the request payload for the selected model
-    body = {
-        "prompt": prompt,
-        "max_gen_len": 512,  # Adjust as needed
-        "temperature": 0.2,  # Lower = more deterministic
-        "top_p": 0.95
+    return chat_history + [[user_message, assistant_reply]]
+
+# Gradio UI design with Matrix theme
+with gr.Blocks(theme=gr.themes.Soft(primary_hue="green", secondary_hue="green")) as demo:
+    # Inject custom CSS for Matrix-style scrollbar and UI tweaks
+    gr.HTML("""
+    <style>
+    /* Matrix-style sleek scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+        background: #10181a;
     }
-
-    try:
-        response = client.invoke_model(
-            modelId=model_id,
-            body=bytes(str(body), 'utf-8'),
-            accept='application/json',
-            contentType='application/json'
+    ::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, #00ff00 0%, #006400 100%);
+        border-radius: 6px;
+        box-shadow: 0 0 6px #00ff00;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #00ff00;
+    }
+    html {
+        scrollbar-color: #00ff00 #10181a;
+        scrollbar-width: thin;
+    }
+    /* Chatbot area adjustments */
+    .matrix-chatbot-container {
+        position: relative;
+        background: #10181a !important;
+        border: 1px solid #00ff0033;
+        border-radius: 12px;
+        box-shadow: 0 0 16px #00ff0033;
+        padding-top: 40px !important;
+    }
+    /* Move Gradio's default clear and scroll-to-bottom buttons to top right */
+    .svelte-drgfj2, /* clear chat button */
+    .svelte-1ipelgc { /* scroll-to-bottom button */
+        position: absolute !important;
+        top: 8px !important;
+        right: 16px !important;
+        z-index: 20 !important;
+        background: #10181a !important;
+        border: 1px solid #00ff00 !important;
+        color: #00ff00 !important;
+        border-radius: 50% !important;
+        width: 32px !important;
+        height: 32px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-shadow: 0 0 8px #00ff00 !important;
+        cursor: pointer !important;
+        transition: background 0.2s !important;
+        margin-left: 40px !important;
+    }
+    .svelte-drgfj2:hover, .svelte-1ipelgc:hover {
+        background: #00ff00 !important;
+        color: #10181a !important;
+    }
+    /* Space the two icons horizontally */
+    .svelte-drgfj2 { right: 56px !important; }
+    .svelte-1ipelgc { right: 16px !important; }
+    </style>
+    """)
+    gr.Markdown("""
+    <div style='text-align:center;'>
+        <h1 style='font-family:Monospace; color:#00FF00; text-shadow: 0 0 10px #00FF00;'>⚡ Matrix Coding Assistant ⚡</h1>
+        <p style='font-size:18px; color:#00FF00; text-shadow: 0 0 5px #00FF00;'>
+            <b>Welcome to the Matrix...</b><br>
+            Enter your Groq API key to access the system.
+        </p>
+    </div>
+    """)
+    
+    with gr.Row():
+        api_key = gr.Textbox(
+            label="Groq API Key",
+            placeholder="Paste your Groq API key here...",
+            type="password",
+            show_label=True,
+            elem_id="api-key-box"
         )
-        # Parse the response
-        result = response['body'].read().decode('utf-8')
-        # The response format may vary; adjust parsing as needed
-        # For demonstration, we assume the generated code is in 'generation' key
-        import json
-        result_json = json.loads(result)
-        generated_code = result_json.get('generation', 'No code generated.')
-        return generated_code
-    except Exception as e:
-        return f"Error generating code: {e}"
-
-# -----------------------------
-# Gradio UI Setup (Region, Model ID, Prompt)
-# -----------------------------
-def main():
-    """
-    Launches the Gradio app for the coding assistant.
-    The user provides AWS region, Bedrock model ID, and the prompt via the UI.
-    """
-    description = """
-    # My Coding Assistant\n\n
-    Enter the AWS region, Bedrock model ID, and your coding prompt. The assistant will generate code using your selected Bedrock model.\n\n
-    (AWS credentials are securely provided by the environment or IAM Role.)
-    """
-    iface = gr.Interface(
-        fn=generate_code,
-        inputs=[
-            gr.Textbox(lines=1, label="AWS Region"),
-            gr.Textbox(lines=1, label="Bedrock Model ID"),
-            gr.Textbox(lines=4, label="Enter your coding prompt")
-        ],
-        outputs=gr.Code(label="Generated Code"),
-        title="My Coding Assistant",
-        description=description,
-        allow_flagging='never',
-        theme="default"
+    
+    chatbot = gr.Chatbot(
+        label="Coding Assistant",
+        avatar_images=(None, "https://em-content.zobj.net/source/microsoft-teams/337/robot_1f916.png"),
+        bubble_full_width=False,
+        height=400,
+        show_copy_button=True,
+        render_markdown=True,
+        elem_classes=["matrix-chatbot-container"]
     )
-    iface.launch(server_name="0.0.0.0", server_port=7860)
+    # (Removed custom clear chat button)
+    
+    with gr.Row():
+        user_input = gr.Textbox(
+            label="Your Message",
+            placeholder="Ask me anything about coding...",
+            lines=2,
+            autofocus=True
+        )
+        send_btn = gr.Button("Send", elem_id="send-btn")
+    
+    # Store chat history in state
+    state = gr.State([])
+
+    def respond(api_key, user_message, chat_history):
+        updated_history = chat_with_groq(api_key, chat_history, user_message)
+        return updated_history, ""
+
+    send_btn.click(
+        respond,
+        inputs=[api_key, user_input, state],
+        outputs=[chatbot, user_input],
+        queue=False
+    )
+    user_input.submit(
+        respond,
+        inputs=[api_key, user_input, state],
+        outputs=[chatbot, user_input],
+        queue=False
+    )
+    
+    # Update state on every new message
+    chatbot.change(lambda x: x, chatbot, state)
+
+    gr.Markdown("""
+    <div style='text-align:center; margin-top: 2em;'>
+        <p style='color:#00FF00; text-shadow: 0 0 3px #00FF00;'>
+            <i>System: Your API key is encrypted and never stored in the Matrix.</i>
+        </p>
+    </div>
+    """)
 
 if __name__ == "__main__":
-    main()
+    demo.launch()
