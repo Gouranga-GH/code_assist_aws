@@ -1,5 +1,4 @@
 import gradio as gr
-# Correct import for Groq integration
 from langchain_groq import ChatGroq
 
 # System prompt for the coding assistant
@@ -8,7 +7,7 @@ SYSTEM_PROMPT = (
     "Always provide clear, step-by-step explanations and well-commented code."
 )
 
-# Default model name for Groq (can be parameterized if needed)
+# Default model name for Groq
 DEFAULT_MODEL = "gemma2-9b-it"
 
 def chat_with_groq(api_key, chat_history, user_message):
@@ -42,12 +41,12 @@ def chat_with_groq(api_key, chat_history, user_message):
 
     return chat_history + [[user_message, assistant_reply]]
 
-# Gradio UI design with Matrix theme
+# Gradio UI design
 with gr.Blocks(theme=gr.themes.Soft(primary_hue="green", secondary_hue="green")) as demo:
-    # Inject custom CSS for Matrix-style scrollbar and UI tweaks
+    # Inject custom CSS for scrollbar and UI tweaks
     gr.HTML("""
     <style>
-    /* Matrix-style sleek scrollbar */
+    /* Sleek scrollbar */
     ::-webkit-scrollbar {
         width: 8px;
         background: #10181a;
@@ -131,7 +130,7 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="green", secondary_hue="green"))
         render_markdown=True,
         elem_classes=["matrix-chatbot-container"]
     )
-    # (Removed custom clear chat button)
+    
     
     with gr.Row():
         user_input = gr.Textbox(
