@@ -1,4 +1,4 @@
-# Coding Assistant (Gradio + LangChain + Groq)
+# Coding Assistant
 
 A coding assistant powered by [LangChain](https://python.langchain.com/) and [Groq](https://groq.com/), with a modern Gradio UI. This assistant helps you with coding questions, code generation, and detailed explanations.
 
